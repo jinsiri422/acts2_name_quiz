@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🤍 사랑으로 하나되는 Acts2부</title>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -66,13 +67,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Ne
 .fam-스탭{background:#f5e8fe;color:#602080;}
 .fam-새가족팸{background:#fefde8;color:#806000;}
 
-/* 관리자 수정 버튼 */
-.edit-actions{position:absolute;top:6px;right:6px;display:none;gap:3px;}
-.admin-mode .edit-actions{display:flex;}
-.edit-btn{width:22px;height:22px;border-radius:50%;border:1px solid #eee;background:#fff;cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center;color:#999;}
-.edit-btn.del:hover{background:#ffeeee;color:#e05050;}
-.edit-btn.edt:hover{background:#eef0ff;color:#5070d0;}
-
 /* ── 퀴즈 ── */
 .quiz-wrap{padding:16px;}
 .quiz-mode-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
@@ -121,10 +115,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Ne
 .modal p{font-size:13px;color:#aaa;margin-bottom:16px;}
 
 /* PIN */
-.pin-row{display:flex;gap:8px;justify-content:center;margin-bottom:14px;}
-.pin-box{width:48px;height:54px;border-radius:12px;border:1.5px solid #e0d0e8;font-size:24px;text-align:center;background:#faf5fc;color:#333;}
-.pin-box:focus{outline:none;border-color:#c2427a;box-shadow:0 0 0 3px rgba(194,66,122,.15);}
-.pin-err{color:#e05050;font-size:12px;text-align:center;margin-bottom:10px;display:none;}
+
+
+
+
 
 /* 폼 */
 .form-row{margin-bottom:12px;}
@@ -152,6 +146,30 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Ne
 .loading-dot:nth-child(2){animation-delay:.2s;}
 .loading-dot:nth-child(3){animation-delay:.4s;}
 @keyframes bounce{0%,80%,100%{transform:translateY(0);}40%{transform:translateY(-8px);}}
+/* 관리자 명단 */
+.management-open .stat-bar, .management-open .tab-bar,
+.management-open #filter-bar, .management-open .section-page{display:none!important;}
+.management{max-width:860px;margin:auto;padding:20px 16px;}
+.management h2{font-size:19px;margin-bottom:12px;}
+.manage-filters{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;}
+.manage-filters input,.manage-filters select{width:100%;min-width:0;padding:9px;border:1px solid #e0d0e8;border-radius:8px;background:#fff;font:inherit;}
+.manage-check{display:flex;align-items:center;gap:7px;margin:12px 0;font-size:14px;}
+.manage-row{display:flex;align-items:center;gap:12px;padding:10px;background:#fff;border:1px solid #f0e0ec;border-radius:12px;margin:6px 0;}
+.manage-row .avatar{margin:0;flex:none;position:relative;}
+.manage-row img,.avatar img,.detail-avatar img,.quiz-avatar img{position:absolute;inset:0;}
+.manage-text{flex:1;min-width:0;overflow-wrap:anywhere;}
+.manage-text small{display:block;color:#685966;margin-top:3px;}
+.manage-row button{flex:none;min-height:38px;}
+.quiz-avatar{position:relative;}
+.photo-preview{display:block;width:100px;height:100px;object-fit:cover;border-radius:12px;margin:8px 0;}
+[hidden]{display:none!important;}
+.form-status{font-size:13px;color:#a03060;min-height:1.25em;margin-top:8px;}
+.modal{max-height:calc(100dvh - 32px);overflow:auto;}
+@media(max-width:520px){
+  .manage-filters{grid-template-columns:1fr 1fr;}
+  .manage-filters input{grid-column:1/-1;}
+  .site-header .admin-btn{position:static;transform:none;margin-top:7px;}
+}
 </style>
 </head>
 <body>
@@ -159,15 +177,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Ne
 <div class="site-header">
   <h1>🤍 사랑으로 하나되는 Acts2부</h1>
   <p>멤버 <span id="total-cnt">-</span>명</p>
-  <button class="admin-btn" onclick="openPinModal()">관리자</button>
+  <button class="admin-btn" onclick="openManagement()">관리자</button>
 </div>
 
 <div class="admin-bar" id="admin-bar">
-  <span class="admin-badge">관리자 모드</span>
-  <button class="btn-add" onclick="openMemberForm()">+ 멤버 추가</button>
-  <button class="btn-add" style="background:#5070d0;" onclick="uploadAllToFirebase()">DB 초기 업로드</button>
-  <button class="btn-logout" onclick="doLogout()">로그아웃</button>
+  <button type="button" class="btn-add" onclick="openMemberForm()">+ 멤버 추가</button>
+  <button type="button" class="btn-logout" onclick="showManagement(false)">퀴즈로 돌아가기</button>
+  <button type="button" class="btn-logout" onclick="doLogout()">로그아웃</button>
 </div>
+
+<section class="management" id="management" hidden>
+  <h2>멤버 관리</h2>
+  <div class="manage-filters">
+    <input id="manage-name" type="search" placeholder="이름 검색" aria-label="이름 검색">
+    <select id="manage-fam" aria-label="팸"></select>
+    <select id="manage-cell" aria-label="셀"></select>
+  </div>
+  <label class="manage-check"><input type="checkbox" id="manage-no-photo"> 사진 없는 멤버만 보기</label>
+  <p id="manage-count" class="form-status" role="status"></p>
+  <div id="manage-list"></div>
+</section>
 
 <div class="stat-bar" id="stat-bar">
   <div class="stat-item"><div class="stat-num" id="s-total">-</div><div class="stat-lbl">전체</div></div>
@@ -230,47 +259,48 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Ne
   </div>
 </div>
 
-<!-- PIN 모달 -->
-<div class="overlay" id="pin-overlay">
-  <div class="modal">
-    <h2>관리자 로그인</h2>
-    <p>4자리 PIN을 입력해 주세요</p>
-    <div class="pin-row">
-      <input class="pin-box" type="password" maxlength="1" id="p0" oninput="nextPin(0)" onkeydown="backPin(event,0)">
-      <input class="pin-box" type="password" maxlength="1" id="p1" oninput="nextPin(1)" onkeydown="backPin(event,1)">
-      <input class="pin-box" type="password" maxlength="1" id="p2" oninput="nextPin(2)" onkeydown="backPin(event,2)">
-      <input class="pin-box" type="password" maxlength="1" id="p3" oninput="nextPin(3)" onkeydown="backPin(event,3)">
-    </div>
-    <div class="pin-err" id="pin-err">PIN이 틀렸어요</div>
-    <button class="btn-primary" onclick="checkPin()">확인</button>
-    <button class="btn-cancel" onclick="closePinModal()">취소</button>
+<div class="overlay" id="login-overlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="login-title">
+    <h2 id="login-title">관리자 로그인</h2>
+    <p>관리자로 등록된 구글 계정으로 로그인해 주세요.</p>
+    <button class="btn-primary" id="google-login" onclick="signInAdmin()">Google로 로그인</button>
+    <button class="btn-cancel" onclick="closeLogin()">닫기</button>
+    <div class="form-status" id="login-status" role="status"></div>
   </div>
 </div>
 
 <!-- 멤버 추가/수정 모달 -->
 <div class="overlay" id="form-overlay">
-  <div class="modal">
+  <form class="modal" id="member-form" role="dialog" aria-modal="true" aria-labelledby="form-title">
     <h2 id="form-title">멤버 추가</h2>
     <p id="form-sub">새 멤버 정보를 입력해 주세요</p>
-    <div class="form-row"><label>이름 *</label><input id="f-name" placeholder="이름"></div>
-    <div class="form-row"><label>팸 *</label>
-      <select id="f-fam">
+    <div class="form-row"><label for="f-name">이름 *</label><input id="f-name" required placeholder="이름"></div>
+    <div class="form-row"><label for="f-fam">팸 *</label>
+      <select id="f-fam" required>
         <option value="">선택</option>
         <option>종현팸</option><option>재호팸</option><option>향팸</option>
         <option>임원단팸</option><option>스탭</option><option>새가족팸</option>
       </select>
     </div>
-    <div class="form-row"><label>셀</label><input id="f-cell" placeholder="예: 채영 & 하영셀"></div>
-    <div class="form-row"><label>출생연도 *</label><input id="f-year" type="number" placeholder="예: 2001" min="1990" max="2010"></div>
-    <div class="form-row"><label>성별</label>
+    <div class="form-row"><label for="f-cell">셀</label><input id="f-cell" placeholder="예: 채영 & 하영셀"></div>
+    <div class="form-row"><label for="f-year">출생연도 *</label><input id="f-year" required type="number" placeholder="예: 2001" min="1900" max="2100"></div>
+    <div class="form-row"><label for="f-gender">성별</label>
       <select id="f-gender"><option value="">선택</option><option>남</option><option>여</option></select>
     </div>
-    <div class="form-row"><label>직책</label><input id="f-role" placeholder="예: 리더, 셀원"></div>
-    <div class="form-row"><label>사진 URL</label><input id="f-photo" placeholder="구글 드라이브 링크 붙여넣기"></div>
+    <div class="form-row"><label for="f-role">직책</label><input id="f-role" placeholder="예: 리더, 셀원"></div>
+    <div class="form-row">
+      <label for="f-photo">사진 선택</label>
+      <input id="f-photo" type="file" accept="image/*">
+      <img class="photo-preview" id="photo-preview" alt="멤버 사진 미리보기" hidden>
+      <button type="button" id="photo-reset" class="btn-cancel" hidden>선택한 사진 취소</button>
+      <button type="button" id="photo-remove" class="btn-cancel" hidden>사진 제거</button>
+    </div>
     <input type="hidden" id="f-docid">
-    <button class="btn-primary" onclick="saveMember()">저장</button>
-    <button class="btn-cancel" onclick="closeForm()">취소</button>
-  </div>
+    <div id="form-status" class="form-status" role="status"></div>
+    <button type="button" class="btn-cancel" id="member-delete" hidden>멤버 삭제</button>
+    <button type="submit" class="btn-primary" id="member-save">저장</button>
+    <button type="button" class="btn-cancel" id="member-cancel" onclick="closeForm()">취소</button>
+  </form>
 </div>
 
 <!-- 멤버 상세 모달 -->
@@ -291,134 +321,8 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+const auth = firebase.auth();
 
-// ── 관리자 PIN ──
-const ADMIN_PIN = "0521";
-
-// ── 초기 데이터 (엑셀에서 파싱) ──
-const INIT_MEMBERS = [
-  {name:"고종현",fam:"종현팸",cell:"미배정",year:2000,gender:"남",role:"양육스탭",photo:"https://drive.google.com/thumbnail?id=1ZL-E5_kYcKoyrRmohktolqusZq17AO95&sz=w200"},
-  {name:"한채영",fam:"종현팸",cell:"채영 & 하영셀",year:2006,gender:"여",role:"리더",photo:"https://drive.google.com/thumbnail?id=1YCY3_nLpUPr6BlxDrOp47RB0t1SxjVJy&sz=w200"},
-  {name:"임하영",fam:"종현팸",cell:"채영 & 하영셀",year:2002,gender:"여",role:"코리더",photo:"https://drive.google.com/thumbnail?id=1dXT5B8AJll7VsY-9ABpZRRNtWKt1UVYm&sz=w200"},
-  {name:"조남혁",fam:"종현팸",cell:"채영 & 하영셀",year:2000,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1vdHnWfJFGhnSDVI6g0TUkLI1is3ZqA0_&sz=w200"},
-  {name:"강환웅",fam:"종현팸",cell:"채영 & 하영셀",year:2001,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1ItaijvEfQyYf0htj2xlcOwHLw7YwVpdr&sz=w200"},
-  {name:"김재우",fam:"종현팸",cell:"채영 & 하영셀",year:2001,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1kEP0NEcgSgQXhnXcM4g2fsTmBBYl4L3K&sz=w200"},
-  {name:"신주희",fam:"종현팸",cell:"채영 & 하영셀",year:2001,gender:"여",role:"임원단",photo:"https://drive.google.com/thumbnail?id=18dtl2rp_P4v4IGfg6zs-aFDQP93JgBla&sz=w200"},
-  {name:"이태현",fam:"종현팸",cell:"채영 & 하영셀",year:2001,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1Af3IX3rk-USyHPlgeNc1dJkUUSp8iLJl&sz=w200"},
-  {name:"최다은",fam:"종현팸",cell:"채영 & 하영셀",year:2001,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1Mfk0FD0AaRSIjUVi7UIxpMkdmh2HMSh9&sz=w200"},
-  {name:"오명환",fam:"종현팸",cell:"채영 & 하영셀",year:2002,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1ppyU-SRP3aaNcYOSsSWuJ6zbDl4GjQxa&sz=w200"},
-  {name:"홍정민",fam:"종현팸",cell:"채영 & 하영셀",year:2004,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1EWx_3bxZc9jeQbdnqlAx52DJkttmLXXK&sz=w200"},
-  {name:"김하은",fam:"종현팸",cell:"채영 & 하영셀",year:2006,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1XJ3vyJLrwkXYu0T6wU78YwoPoT9BEYEk&sz=w200"},
-  {name:"유지민",fam:"종현팸",cell:"채영 & 하영셀",year:2007,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=17AXAlTfMaWjSrrf7BQGvmymQlWrCXfg7&sz=w200"},
-  {name:"김가영",fam:"종현팸",cell:"가영 & 동현A셀",year:1999,gender:"여",role:"리더",photo:"https://drive.google.com/thumbnail?id=1FM16NIUKv_7z38t_OssK40Ocu7F-EQfZ&sz=w200"},
-  {name:"김동현A",fam:"종현팸",cell:"가영 & 동현A셀",year:2003,gender:"남",role:"코리더",photo:"https://drive.google.com/thumbnail?id=1I_-wyU9afTZgEscpCGuBPE9xs2P7EGzi&sz=w200"},
-  {name:"이은찬",fam:"종현팸",cell:"가영 & 동현A셀",year:1999,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=18eUoYzP3z1GMwUF2DxYC_DkggfRFrn2C&sz=w200"},
-  {name:"최예림",fam:"종현팸",cell:"가영 & 동현A셀",year:2000,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1QK_uGGQwCAmj222xlnL5Idp0ajS3izIK&sz=w200"},
-  {name:"백윤아",fam:"종현팸",cell:"가영 & 동현A셀",year:2001,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1ls1yokjVPVVEmnPCSSsvlgzTYect7kOr&sz=w200"},
-  {name:"김희주",fam:"종현팸",cell:"가영 & 동현A셀",year:2002,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1eeYU6vP4R_Ix8H09DMSULMap9M1PF-iM&sz=w200"},
-  {name:"옥민준",fam:"종현팸",cell:"가영 & 동현A셀",year:2002,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1KNmMedr5GubN-_-4WHS5Wz1id-Js3FLX&sz=w200"},
-  {name:"김민서",fam:"종현팸",cell:"가영 & 동현A셀",year:2003,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1FL0H6gjRiBVaCO8oA__TtYZ4xUn_fnsm&sz=w200"},
-  {name:"이창희",fam:"종현팸",cell:"가영 & 동현A셀",year:2003,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1NHiSIGMvdhk3PFQ2FcuH_N3n3fh4x4mh&sz=w200"},
-  {name:"김연수",fam:"종현팸",cell:"가영 & 동현A셀",year:2004,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1OWjMgOD-ki12mSG3-rA1VqE-qLNsmJ5B&sz=w200"},
-  {name:"박시우",fam:"종현팸",cell:"가영 & 동현A셀",year:2004,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=11zCleK8yTIvjEQ956CLeXmN_Fnzryg20&sz=w200"},
-  {name:"김범준",fam:"종현팸",cell:"가영 & 동현A셀",year:2005,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1rrOtoU6Wr-OW2gdZ6qeeYbzlMinQy2DS&sz=w200"},
-  {name:"김신웅",fam:"종현팸",cell:"신웅 & 재서셀",year:2003,gender:"남",role:"리더",photo:"https://drive.google.com/thumbnail?id=1g3EmdYKTIhTcFnkNhA_R83KNX3DZHhBJ&sz=w200"},
-  {name:"김재서",fam:"종현팸",cell:"신웅 & 재서셀",year:2003,gender:"남",role:"코리더",photo:"https://drive.google.com/thumbnail?id=1ijcAzHy2tn_aCtGGjNPdHTRdPamg_CxS&sz=w200"},
-  {name:"김민성B",fam:"종현팸",cell:"신웅 & 재서셀",year:1998,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1KrcOIMSmieId7UumgJ6NevhZ5NJvP90z&sz=w200"},
-  {name:"신기영",fam:"종현팸",cell:"신웅 & 재서셀",year:1998,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1tNgloBT-vn2b2TpjOyohGXNCAQULfF5B&sz=w200"},
-  {name:"이유진",fam:"종현팸",cell:"신웅 & 재서셀",year:1998,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1FsgNhZbCefAzFLAZk_zKeYwldVjkfG98&sz=w200"},
-  {name:"강예은",fam:"종현팸",cell:"신웅 & 재서셀",year:2002,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1tLyqximVgaptTgTaxB0ysV1lfYaOvWKw&sz=w200"},
-  {name:"공소현",fam:"종현팸",cell:"신웅 & 재서셀",year:2002,gender:"여",role:"임원단",photo:"https://drive.google.com/thumbnail?id=17jxVPocIqSrdijvEk2NH2CPGEbkCXiut&sz=w200"},
-  {name:"전선우",fam:"종현팸",cell:"신웅 & 재서셀",year:2003,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1zzRHFSTBVwtHqQOO0gbmHDF1M7U0r6ok&sz=w200"},
-  {name:"채지훈",fam:"종현팸",cell:"신웅 & 재서셀",year:2003,gender:"남",role:"연합회",photo:"https://drive.google.com/thumbnail?id=1iqa2gOKSqCrZE5zH5h70ojSQcg0o-ZnH&sz=w200"},
-  {name:"채성은",fam:"종현팸",cell:"신웅 & 재서셀",year:2004,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1fzNHYGBJHyrqVHQyJyqo2E8-XmOCrKLL&sz=w200"},
-  {name:"김은민",fam:"종현팸",cell:"신웅 & 재서셀",year:2006,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=13N0unJbEGtMrKGV5Ru07dBeU-1AMQbJp&sz=w200"},
-  {name:"박에스더",fam:"종현팸",cell:"신웅 & 재서셀",year:2007,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=19zmwZWpQjtt3cWh7dTzgOjYuXUDIEzow&sz=w200"},
-  {name:"이재호",fam:"재호팸",cell:"미배정",year:1998,gender:"남",role:"양육스탭",photo:"https://drive.google.com/thumbnail?id=1ZghmH2hZcn3XAIg1D5b5JI-dmYTAG3Fl&sz=w200"},
-  {name:"조현진",fam:"재호팸",cell:"현진 & 하람셀",year:2000,gender:"여",role:"리더",photo:"https://drive.google.com/thumbnail?id=1e1Z_6JfbjrZ2aUqIGixF3FbleftMHL31&sz=w200"},
-  {name:"이하람",fam:"재호팸",cell:"현진 & 하람셀",year:1999,gender:"여",role:"코리더",photo:"https://drive.google.com/thumbnail?id=1q_7O19apwtfQV0iW34caAqmr5KhsA7Ek&sz=w200"},
-  {name:"정광일",fam:"재호팸",cell:"현진 & 하람셀",year:1998,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1tx_f7VRUUJTgc6weVvp-Mx8JObklc_4C&sz=w200"},
-  {name:"박상현",fam:"재호팸",cell:"현진 & 하람셀",year:1999,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1Yq2vpQziIm-kK4JTlcLpNx8Z14W7AcgD&sz=w200"},
-  {name:"김민영",fam:"재호팸",cell:"현진 & 하람셀",year:2000,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1EzyscXCnuOlBU0Kr0_4n2PvKcdDOI0Kl&sz=w200"},
-  {name:"이채은",fam:"재호팸",cell:"현진 & 하람셀",year:2001,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=12zOZCIHYtxivSo0iYITkWrn3ntVQpn7V&sz=w200"},
-  {name:"박찬주",fam:"재호팸",cell:"현진 & 하람셀",year:2003,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1rYuwsbv6LBGctoExlB-95EOy3fS38ZiO&sz=w200"},
-  {name:"성지원",fam:"재호팸",cell:"현진 & 하람셀",year:2003,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1SyqnbGf1-RY7389XxD1pzh1z0MDoQbxM&sz=w200"},
-  {name:"고은별",fam:"재호팸",cell:"현진 & 하람셀",year:2004,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1WUC2ewEnpWXPHUF8yPbRk3ou4XMaIibk&sz=w200"},
-  {name:"정예민",fam:"재호팸",cell:"현진 & 하람셀",year:2006,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1S5lhvO30-FyjgT8qfx-2PRnbJK8k1vV1&sz=w200"},
-  {name:"백가윤",fam:"재호팸",cell:"현진 & 하람셀",year:2007,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1xm1Don2TU-gNsEXTVrorj8Ia8oxokRxw&sz=w200"},
-  {name:"우명지",fam:"재호팸",cell:"명지 & 지안셀",year:2000,gender:"여",role:"리더",photo:"https://drive.google.com/thumbnail?id=1dytuLwmWpZpjAHWdPRv-KSzDn7brghvE&sz=w200"},
-  {name:"양지안",fam:"재호팸",cell:"명지 & 지안셀",year:1998,gender:"여",role:"코리더",photo:"https://drive.google.com/thumbnail?id=1KMKMShSBNfmw0mMJY89U9FElxY-gHS1o&sz=w200"},
-  {name:"김영일",fam:"재호팸",cell:"명지 & 지안셀",year:2000,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1Qe97G8G8nNHlCeRj7hTHUBKifaC7newI&sz=w200"},
-  {name:"변우영",fam:"재호팸",cell:"명지 & 지안셀",year:2000,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=11RTEw9wxPGZRQm4Vo7IkK3J2LkuGkWBs&sz=w200"},
-  {name:"권지현",fam:"재호팸",cell:"명지 & 지안셀",year:2001,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1UL402uEUrUbgZ00dn_wCFSYlmmz8Jm7R&sz=w200"},
-  {name:"최수빈",fam:"재호팸",cell:"명지 & 지안셀",year:2001,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1pNMHVYHFbeJc5TsqOhXdax3jQW1kEtSv&sz=w200"},
-  {name:"이다연",fam:"재호팸",cell:"명지 & 지안셀",year:2002,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1n3F-oPlRnVIwUSK6grVal1UO0I-a3Zjj&sz=w200"},
-  {name:"황윤하",fam:"재호팸",cell:"명지 & 지안셀",year:2002,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1fhIKBLU1akbnwRRmqvcAOUmisgmBgJjt&sz=w200"},
-  {name:"조하은",fam:"재호팸",cell:"명지 & 지안셀",year:2003,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1kzdGXEtImf5rBu2CAHNLGsbb8ZisucF8&sz=w200"},
-  {name:"김윤서",fam:"재호팸",cell:"명지 & 지안셀",year:2004,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1bj4m0_03fPSDJ59At_SrVo9a6e7K-QWG&sz=w200"},
-  {name:"박규민",fam:"재호팸",cell:"명지 & 지안셀",year:2004,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1Baat1zKMEofC8zFXK-NbWhDmIdt6vVL4&sz=w200"},
-  {name:"송민아",fam:"재호팸",cell:"명지 & 지안셀",year:2007,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1zc5k04aWBqvjVOfR6d6XpDm6ghiBAJdF&sz=w200"},
-  {name:"조하민",fam:"재호팸",cell:"하민 & 수아셀",year:2003,gender:"여",role:"리더",photo:"https://drive.google.com/thumbnail?id=1mNXuwbDdTtiv4FiSBpdJSTeRJlkr_UGu&sz=w200"},
-  {name:"한수아",fam:"재호팸",cell:"하민 & 수아셀",year:2001,gender:"여",role:"코리더",photo:"https://drive.google.com/thumbnail?id=1rPG4V4MYDqhkOc6sTdyKyTpE1fkddXqA&sz=w200"},
-  {name:"이화준",fam:"재호팸",cell:"하민 & 수아셀",year:1998,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1cjTMtUGGw8Y4qnF9qIXxhqTJHaLdKuwl&sz=w200"},
-  {name:"이정찬",fam:"재호팸",cell:"하민 & 수아셀",year:2000,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=12FgDcZWtwqdZB6ZZoqKP38Sm97_Ccze8&sz=w200"},
-  {name:"강주현",fam:"재호팸",cell:"하민 & 수아셀",year:2001,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1Xbt3JdbDFoSvmgh3LD_B2nGfeiOikZA5&sz=w200"},
-  {name:"이예진",fam:"재호팸",cell:"하민 & 수아셀",year:2001,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1b_M_LjgCYFQJXTYhIKH499OBnq2VsK1d&sz=w200"},
-  {name:"임휘성",fam:"재호팸",cell:"하민 & 수아셀",year:2002,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1XeRyuDFU8jkTFlVVRGqvk4GV4JjxwWv7&sz=w200"},
-  {name:"김동현B",fam:"재호팸",cell:"하민 & 수아셀",year:2003,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1g54wiX1gERjDzveF4TvJkBnVjfe-Ke-H&sz=w200"},
-  {name:"소재희",fam:"재호팸",cell:"하민 & 수아셀",year:2003,gender:"여",role:"임원단",photo:"https://drive.google.com/thumbnail?id=1XflL8e4cSNM6rTxZxLrLFHtACT6XQdrl&sz=w200"},
-  {name:"유시은",fam:"재호팸",cell:"하민 & 수아셀",year:2003,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1rPjz3N1377L8tHyED-qX9_b600JmbYSN&sz=w200"},
-  {name:"황지우",fam:"재호팸",cell:"하민 & 수아셀",year:2006,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=10NihtvGr-zp5cSWGDL_GYp5iVDhQkzdh&sz=w200"},
-  {name:"송연조",fam:"재호팸",cell:"하민 & 수아셀",year:2007,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1qSGCqZa_ijS5FI6ednFFlfDwaCb0mXdy&sz=w200"},
-  {name:"이향",fam:"향팸",cell:"미배정",year:1998,gender:"여",role:"양육스탭",photo:"https://drive.google.com/thumbnail?id=1fHb_Uu6cnehoXaxVuHlyyZGfDgkPIDcx&sz=w200"},
-  {name:"임요나",fam:"향팸",cell:"요나 & 시연셀",year:1999,gender:"남",role:"리더",photo:"https://drive.google.com/thumbnail?id=1tlbBdD0uVh50V_SPhFseHfCB8i4nRU2C&sz=w200"},
-  {name:"배시연",fam:"향팸",cell:"요나 & 시연셀",year:2000,gender:"여",role:"코리더",photo:"https://drive.google.com/thumbnail?id=1OIchECg-l1xVHlpjhdduE6bMWDwDvxHv&sz=w200"},
-  {name:"김성은",fam:"향팸",cell:"요나 & 시연셀",year:2001,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1zRznwgkE8f7JCg5adeOqRQk3v8CIlK9p&sz=w200"},
-  {name:"노채영",fam:"향팸",cell:"요나 & 시연셀",year:2001,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=18fwZ6kfeD3J5Nkb5O7sezjamwTzFQUL_&sz=w200"},
-  {name:"김도아",fam:"향팸",cell:"요나 & 시연셀",year:2003,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1dF3UQI1ZxkQ4GjLxgZg1vsy2Iica57UG&sz=w200"},
-  {name:"김요한",fam:"향팸",cell:"요나 & 시연셀",year:2003,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=14FmbbZwIbGsdyPugh1q82f2__-s_5lnB&sz=w200"},
-  {name:"박용하",fam:"향팸",cell:"요나 & 시연셀",year:2003,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1U7vCvUwqgLAMojoRKBZO7iazt8P9aE5N&sz=w200"},
-  {name:"강현우",fam:"향팸",cell:"요나 & 시연셀",year:2006,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1qZZm2f7N23le2nXzJ_A9JYZo-Yjq50Mt&sz=w200"},
-  {name:"정선교",fam:"향팸",cell:"요나 & 시연셀",year:2006,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1WOdM9P56qHsaQdX8HWAq6Mef2JMRsMeH&sz=w200"},
-  {name:"정예서",fam:"향팸",cell:"요나 & 시연셀",year:2006,gender:"여",role:"임원단",photo:"https://drive.google.com/thumbnail?id=14w1YlYiy2ZHpMvvFrR-7c8QuLF9y5b6K&sz=w200"},
-  {name:"박하윤",fam:"향팸",cell:"요나 & 시연셀",year:2007,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1DiriOs7PKTEWtmq0lJTWJAm4Hy5zTsa1&sz=w200"},
-  {name:"주영",fam:"향팸",cell:"영 & 윤우셀",year:1998,gender:"남",role:"리더",photo:"https://drive.google.com/thumbnail?id=16i_6C4Q_tVlU7PmFo5RbL9ShFCFzJ_Va&sz=w200"},
-  {name:"김윤우",fam:"향팸",cell:"영 & 윤우셀",year:2000,gender:"남",role:"코리더",photo:"https://drive.google.com/thumbnail?id=19rKQ39JLnArULi5eXIG0VZg0j9yTH1uP&sz=w200"},
-  {name:"김윤수",fam:"향팸",cell:"영 & 윤우셀",year:1998,gender:"남",role:"임원단",photo:"https://drive.google.com/thumbnail?id=1wRhuh-a_mZLc5xHJguQYrXaZ-qb0PMR1&sz=w200"},
-  {name:"이현욱",fam:"향팸",cell:"영 & 윤우셀",year:1999,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1nBlx7NbEMvoH3SFixINi7GAhQp0fwAg3&sz=w200"},
-  {name:"김지원",fam:"향팸",cell:"영 & 윤우셀",year:2001,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=18yfJpEgqFuJKerWIaZNZwst9PsWWRlM0&sz=w200"},
-  {name:"정동규",fam:"향팸",cell:"영 & 윤우셀",year:2001,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1Yhhn0F-0CyJYzDiRP4GhGq5UYHxyj5p5&sz=w200"},
-  {name:"이재민",fam:"향팸",cell:"영 & 윤우셀",year:2002,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=113mT_pmARjf6y6vmcQP9aavPwFrmnU2D&sz=w200"},
-  {name:"이주은",fam:"향팸",cell:"영 & 윤우셀",year:2002,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1JoO5eMqoxrmja9yO_G5d0U2v41HY7A6n&sz=w200"},
-  {name:"황주원",fam:"향팸",cell:"영 & 윤우셀",year:2003,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1r0_BHQJiKySzwQxlWeZmX8qRrJcakNGf&sz=w200"},
-  {name:"강서현",fam:"향팸",cell:"영 & 윤우셀",year:2004,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1u46zkLjSazeR2ZB9zr52rqbicxMQ4fOv&sz=w200"},
-  {name:"오인서",fam:"향팸",cell:"영 & 윤우셀",year:2005,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1BVoVTw_qFkJTTxb-dpExU9NFzLdQjtFm&sz=w200"},
-  {name:"김한결",fam:"향팸",cell:"한결 & 웅연셀",year:2006,gender:"남",role:"리더",photo:"https://drive.google.com/thumbnail?id=1tK1qQQIeCjNNrEjQWbawMdt9aeNTcY5e&sz=w200"},
-  {name:"유웅연",fam:"향팸",cell:"한결 & 웅연셀",year:1998,gender:"남",role:"코리더",photo:"https://drive.google.com/thumbnail?id=1DR_3cZVF-By0gZEUr-x9puCr-RfsCluA&sz=w200"},
-  {name:"김민성A",fam:"향팸",cell:"한결 & 웅연셀",year:1998,gender:"남",role:"임원단",photo:"https://drive.google.com/thumbnail?id=1gEWUZyk4SEy4GoKcQMW3rtadiNJimy6k&sz=w200"},
-  {name:"문이현",fam:"향팸",cell:"한결 & 웅연셀",year:2001,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1WbApx60QI6NLmOTiQP4xopNPBd7b-Nhn&sz=w200"},
-  {name:"이주빈",fam:"향팸",cell:"한결 & 웅연셀",year:2001,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1JfZ3hC0Ca3vczjqsK6mECKbjZOjatMg9&sz=w200"},
-  {name:"김재현",fam:"향팸",cell:"한결 & 웅연셀",year:2002,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1DxAUD_niizuUm2uo4zgABTQnhN7lxxbS&sz=w200"},
-  {name:"유예린",fam:"향팸",cell:"한결 & 웅연셀",year:2003,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1oJCLOToA3Y1xAyblWbWMJ76rc-ak536K&sz=w200"},
-  {name:"오와다 미노리",fam:"향팸",cell:"한결 & 웅연셀",year:2004,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=17teKrShxGSftpOru1YOSjjIE3i9YdS1w&sz=w200"},
-  {name:"인태영",fam:"향팸",cell:"한결 & 웅연셀",year:2004,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1GdL6oJI4XSj2a7NIKowG5ysPskUOs1uU&sz=w200"},
-  {name:"전준영",fam:"향팸",cell:"한결 & 웅연셀",year:2004,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1hhoxOW1LwXAiEX4ze65EBHWv2iJa_YKT&sz=w200"},
-  {name:"김지혜",fam:"향팸",cell:"한결 & 웅연셀",year:2005,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1j8cDgF6UCd_O87Zaae3CwKJGN6yrF0Kc&sz=w200"},
-  {name:"이승민",fam:"향팸",cell:"한결 & 웅연셀",year:2006,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1ODJkKNWpMry19Y38EuvtYEdt8IQDvH24&sz=w200"},
-  {name:"김동현",fam:"스탭",cell:"미배정",year:1998,gender:"남",role:"새가족 스탭",photo:"https://drive.google.com/thumbnail?id=1eNbZqygaB6JZF16ydRlu6uw_ubdu2HqW&sz=w200"},
-  {name:"이주아",fam:"새가족팸",cell:"미배정",year:2003,gender:"여",role:"새가족리더",photo:"https://drive.google.com/thumbnail?id=16uf_f39KDuO_Pdrgc08e7LVwT8sVIlhj&sz=w200"},
-  {name:"황주은",fam:"새가족팸",cell:"미배정",year:2006,gender:"여",role:"새가족리더",photo:"https://drive.google.com/thumbnail?id=1YeXemSN0V7CCzw-Ed3h_Scncueum-_0T&sz=w200"},
-  {name:"이야나",fam:"새가족팸",cell:"미배정",year:2006,gender:"여",role:"새가족리더",photo:"https://drive.google.com/thumbnail?id=1ueyoKLnLGSjIFbrgdsIvXskmkNs4_QZF&sz=w200"},
-  {name:"백규빈",fam:"종현팸",cell:"채영 & 하영셀",year:2001,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1dFVGA-JvKQVnvTmDmVV625gq0TibhzdD&sz=w200"},
-  {name:"함성호",fam:"종현팸",cell:"가영 & 동현A셀",year:2000,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=118bVAZmNBxhgRBKkTrjpqb50cnpt0Xmd&sz=w200"},
-  {name:"성하영",fam:"재호팸",cell:"현진 & 하람셀",year:2006,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=11qoGHFRhapmT6jE3rRMyVTunvpG2Xd_Z&sz=w200"},
-  {name:"임고은",fam:"재호팸",cell:"하민 & 수아셀",year:2001,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1TYeNVoZxJDREfAedcRg1gHDOvb8783Xy&sz=w200"},
-  {name:"박성민",fam:"향팸",cell:"요나 & 시연셀",year:2004,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1A6RzzR9KSt0ZqSXrIVOhhFWOqGzq1YDK&sz=w200"},
-  {name:"김지호",fam:"향팸",cell:"영 & 윤우셀",year:2002,gender:"여",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1xSkmyCRK37mYGmzEQcyMoFbqIAIQi1Zi&sz=w200"},
-  {name:"곽동욱",fam:"향팸",cell:"한결 & 웅연셀",year:2004,gender:"남",role:"셀원",photo:"https://drive.google.com/thumbnail?id=1auIzCWlrdAMBNPZtjWQw7SmCm5aW0eCP&sz=w200"},
-];
-
-// ── 팸 색상 ──
 const FAM_STYLE = {
   "종현팸":{bg:"#dce8fd",color:"#2a50a0"},
   "재호팸":{bg:"#fddce8",color:"#a03060"},
@@ -427,7 +331,7 @@ const FAM_STYLE = {
   "스탭":{bg:"#eeddf5",color:"#602080"},
   "새가족팸":{bg:"#fdfbdd",color:"#806000"},
 };
-function famStyle(fam){return FAM_STYLE[fam]||{bg:"#f0eaf5",color:"#665577"};}
+function famStyle(fam){return Object.hasOwn(FAM_STYLE,fam)?FAM_STYLE[fam]:{bg:"#f0eaf5",color:"#665577"};}
 
 // ── 나이 ──
 function getAge(y){return 2026-y+1;}
@@ -436,73 +340,54 @@ function ageGroup(y){
   return yy+"또래";
 }
 
-// ── 아바타 HTML ──
-function avatarHtml(m,size=60){
-  const s=famStyle(m.fam);
-  const ini=m.name.slice(0,2);
-  const imgPart=m.photo?`<img src="${m.photo}" onerror="this.style.display='none'">`:'';
-  return `<div class="avatar" style="width:${size}px;height:${size}px;background:${s.bg};color:${s.color};font-size:${Math.round(size*0.3)}px;">${imgPart}${m.photo?'':ini}</div>`;
+function escapeHtml(value){
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  })[char]);
 }
 
-// ── 상태 ──
-let members = [];
-let isAdmin = false;
-let currentTab = 'all';
-let activeFilter = null;
+function photoSource(value){
+  if(typeof value !== 'string') return '';
+  return /^https?:\/\//i.test(value) || /^data:image\/jpeg;base64,[a-z0-9+/=]+$/i.test(value) ? value : '';
+}
 
-// ── Firebase 실시간 리스너 ──
-async function startFirebaseListener(){
-  // Firebase에 데이터 없으면 자동 업로드
-  const check = await db.collection('members').limit(1).get().catch(()=>null);
-  if(check && check.empty){
-    const existingSnap = await db.collection('members').get();
-    const existingNames = new Set(existingSnap.docs.map(d=>d.data().name));
-    const toUpload = INIT_MEMBERS.filter(m=>!existingNames.has(m.name));
-    if(toUpload.length>0){
-      const chunks=[];
-      for(let i=0;i<toUpload.length;i+=500)chunks.push(toUpload.slice(i,i+500));
-      for(const chunk of chunks){
-        const batch=db.batch();
-        chunk.forEach(m=>{batch.set(db.collection('members').doc(),m);});
-        await batch.commit();
-      }
-    }
-  }
-  // 실시간 리스너 시작
-  db.collection('members').orderBy('fam').onSnapshot(snap=>{
-    members = snap.docs.map(d=>({docId:d.id,...d.data()}));
+function memberPhoto(m, lazy=false){
+  const url=photoSource(m.photo);
+  return `<span>${escapeHtml(m.name.slice(0,2))}</span>` + (url
+    ? `<img src="${escapeHtml(url)}" alt="" ${lazy?'loading="lazy"':''} onerror="this.hidden=true">`
+    : '');
+}
+
+function avatarHtml(m,size=60){
+  const style=famStyle(m.fam);
+  return `<div class="avatar" style="position:relative;width:${size}px;height:${size}px;background:${style.bg};color:${style.color};font-size:${Math.round(size*0.3)}px;">${memberPhoto(m,true)}</div>`;
+}
+
+let members=[];
+let membersReady=false;
+let isAdmin=false;
+let currentTab='all';
+let activeFilter=null;
+
+function startFirebaseListener(){
+  db.collection('members').orderBy('fam').onSnapshot(snapshot=>{
+    const firstLoad=!membersReady;
+    membersReady=true;
+    members=snapshot.docs.map(doc=>({...doc.data(),docId:doc.id}));
     updateStats();
     renderCurrentTab();
-  }, err=>{
-    console.error(err);
-    if(members.length===0){
-      members = INIT_MEMBERS.map((m,i)=>({docId:'local_'+i,...m}));
-      updateStats();
-      renderCurrentTab();
+    if(firstLoad && currentTab==='quiz') startQuiz();
+    else if(currentTab==='quiz' && qQueue.length && qIdx>0){
+      const current=members.find(m=>m.docId===qQueue[qIdx-1]?.docId);
+      if(current) element('q-avatar').innerHTML=memberPhoto(current);
     }
+    if(!document.getElementById('management').hidden) renderManagement();
+  }, error=>{
+    console.error(error);
+    const message='멤버 명단을 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.';
+    document.getElementById('page-all').textContent=message;
+    document.getElementById('manage-count').textContent=message;
   });
-}
-
-// ── 초기 업로드 (관리자만) ──
-async function uploadAllToFirebase(){
-  if(!isAdmin){alert('관리자만 가능해요');return;}
-  if(!confirm('중복 체크 후 새 멤버만 업로드할게요. 진행할까요?'))return;
-  const existingSnap = await db.collection('members').get();
-  const existingNames = new Set(existingSnap.docs.map(d=>d.data().name));
-  const toUpload = INIT_MEMBERS.filter(m=>!existingNames.has(m.name));
-  const skipped = INIT_MEMBERS.length - toUpload.length;
-  if(toUpload.length===0){
-    alert('모든 멤버가 이미 등록되어 있어요!\n(' + skipped + '명 중복 건너뜀)');
-    return;
-  }
-  const chunks=[];
-  for(let i=0;i<toUpload.length;i+=500)chunks.push(toUpload.slice(i,i+500));
-  for(const chunk of chunks){
-    const batch=db.batch();
-    chunk.forEach(m=>{batch.set(db.collection('members').doc(),m);});
-    await batch.commit();
-  }
-  alert('업로드 완료!\n✅ 새로 추가: ' + toUpload.length + '명\n⏭ 중복 건너뜀: ' + skipped + '명');
 }
 
 // ── 통계 ──
@@ -540,7 +425,7 @@ function renderCurrentTab(){
   else if(currentTab==='age') groupFn=m=>ageGroup(m.year);
   else groupFn=m=>m.cell;
 
-  const groups={};
+  const groups=Object.create(null);
   members.forEach(m=>{const k=groupFn(m);if(!groups[k])groups[k]=[];groups[k].push(m);});
   const keys=Object.keys(groups).sort((a,b)=>{
     if(currentTab==='age'){
@@ -555,13 +440,13 @@ function renderCurrentTab(){
   fb.style.display='flex';
   fb.innerHTML=`<span class="filter-lbl">필터</span>`+
     `<div class="filter-chip ${!activeFilter?'active':''}" onclick="setFilter(null)">전체</div>`+
-    keys.map(k=>`<div class="filter-chip ${activeFilter===k?'active':''}" onclick="setFilter('${k.replace(/'/g,"\\'")}')">
-      ${k} <span style="color:#ccc">${groups[k].length}</span></div>`).join('');
+    keys.map(k=>`<div class="filter-chip ${activeFilter===k?'active':''}" data-filter="${escapeHtml(k)}" onclick="setFilter(this.dataset.filter)">
+      ${escapeHtml(k)} <span style="color:#ccc">${groups[k].length}</span></div>`).join('');
 
-  const show=activeFilter?{[activeFilter]:groups[activeFilter]}:groups;
+  const show=activeFilter&&groups[activeFilter]?{[activeFilter]:groups[activeFilter]}:groups;
   let html='';
   Object.entries(show).forEach(([k,list])=>{
-    html+=`<div class="section-title">${k} (${list.length}명)</div>`;
+    html+=`<div class="section-title">${escapeHtml(k)} (${list.length}명)</div>`;
     html+=renderGrid(list);
   });
   page.innerHTML=html||'<div class="loading">멤버가 없어요</div>';
@@ -569,22 +454,17 @@ function renderCurrentTab(){
 
 function renderGrid(list){
   if(!list.length)return'<div class="loading">멤버가 없어요</div>';
-  const adminMod=isAdmin?'admin-mode':'';
-  return`<div class="members-grid ${adminMod}">${list.map(m=>renderCard(m)).join('')}</div>`;
+  return`<div class="members-grid">${list.map(m=>renderCard(m)).join('')}</div>`;
 }
 
 function renderCard(m){
   const s=famStyle(m.fam);
-  const roleColor=m.role==='리더'?'#e07aaa':m.role==='코리더'?'#a07ad0':m.role.includes('스탭')?'#60a0d0':'#bbb';
-  return`<div class="member-card" onclick="showDetail('${m.docId}')">
-    <div class="edit-actions">
-      <button class="edit-btn edt" onclick="editMember(event,'${m.docId}')">✎</button>
-      <button class="edit-btn del" onclick="deleteMember(event,'${m.docId}')">✕</button>
-    </div>
+  const roleColor=m.role==='리더'?'#e07aaa':m.role==='코리더'?'#a07ad0':m.role?.includes('스탭')?'#60a0d0':'#bbb';
+  return`<div class="member-card" data-member="${escapeHtml(m.docId)}" onclick="showDetail(this.dataset.member)">
     ${avatarHtml(m)}
-    <div class="member-name">${m.name}</div>
-    <div class="member-sub">${m.cell!=='미배정'?m.cell:m.fam}</div>
-    <div class="role-badge" style="background:${s.bg};color:${s.color};">${m.role}</div>
+    <div class="member-name">${escapeHtml(m.name)}</div>
+    <div class="member-sub">${escapeHtml(m.cell!=='미배정'?m.cell:m.fam)}</div>
+    <div class="role-badge" style="background:${s.bg};color:${s.color};">${escapeHtml(m.role)}</div>
   </div>`;
 }
 
@@ -598,17 +478,15 @@ function showDetail(docId){
   const m=members.find(x=>x.docId===docId);
   if(!m)return;
   const s=famStyle(m.fam);
-  const bigAv=m.photo
-    ?`<div class="detail-avatar" style="background:${s.bg};"><img src="${m.photo}" onerror="this.style.display='none'"></div>`
-    :`<div class="detail-avatar" style="background:${s.bg};color:${s.color};font-size:30px;font-weight:700;">${m.name.slice(0,2)}</div>`;
+  const bigAv=`<div class="detail-avatar" style="position:relative;overflow:hidden;background:${s.bg};color:${s.color};font-size:30px;font-weight:700;">${memberPhoto(m)}</div>`;
   document.getElementById('detail-box').innerHTML=`
     ${bigAv}
-    <div class="detail-name">${m.name}</div>
-    <div class="detail-info">${getAge(m.year)}세 (${m.year}년생) · ${m.gender}</div>
+    <div class="detail-name">${escapeHtml(m.name)}</div>
+    <div class="detail-info">${getAge(m.year)}세 (${escapeHtml(m.year)}년생) · ${escapeHtml(m.gender)}</div>
     <div class="detail-tags">
-      <div class="detail-tag" style="background:${s.bg};color:${s.color};">${m.fam}</div>
-      <div class="detail-tag" style="background:#f0eaf8;color:#805090;">${m.cell}</div>
-      <div class="detail-tag" style="background:#f0f5ff;color:#4060c0;">${m.role}</div>
+      <div class="detail-tag" style="background:${s.bg};color:${s.color};">${escapeHtml(m.fam)}</div>
+      <div class="detail-tag" style="background:#f0eaf8;color:#805090;">${escapeHtml(m.cell)}</div>
+      <div class="detail-tag" style="background:#f0f5ff;color:#4060c0;">${escapeHtml(m.role)}</div>
       <div class="detail-tag" style="background:#f5f5f5;color:#888;">${ageGroup(m.year)}</div>
     </div>
     <button class="close-btn" onclick="document.getElementById('detail-overlay').classList.remove('show')">닫기</button>
@@ -617,91 +495,270 @@ function showDetail(docId){
 }
 function closeDetailIfBg(e){if(e.target===document.getElementById('detail-overlay'))document.getElementById('detail-overlay').classList.remove('show');}
 
-// ── 관리자 ──
-function openPinModal(){document.getElementById('pin-overlay').classList.add('show');setTimeout(()=>document.getElementById('p0').focus(),100);}
-function closePinModal(){
-  document.getElementById('pin-overlay').classList.remove('show');
-  [0,1,2,3].forEach(i=>document.getElementById('p'+i).value='');
-  document.getElementById('pin-err').style.display='none';
+// ── 관리자 로그인과 명단 ──
+const element=id=>document.getElementById(id);
+const field=name=>element('f-'+name);
+let checkedUser=null;
+let pendingAccess=null;
+
+function closeLogin(){
+  element('login-overlay').classList.remove('show');
 }
-function nextPin(i){if(document.getElementById('p'+i).value&&i<3)document.getElementById('p'+(i+1)).focus();}
-function backPin(e,i){
-  if(e.key==='Backspace'&&!document.getElementById('p'+i).value&&i>0)document.getElementById('p'+(i-1)).focus();
-  if(e.key==='Enter')checkPin();
+function openManagement(){
+  if(isAdmin){showManagement(true);return;}
+  element('login-status').textContent='';
+  element('login-overlay').classList.add('show');
+  element('google-login').focus();
 }
-function checkPin(){
-  const pin=[0,1,2,3].map(i=>document.getElementById('p'+i).value).join('');
-  if(pin===ADMIN_PIN){
-    isAdmin=true; closePinModal();
-    document.getElementById('admin-bar').classList.add('show');
-    renderCurrentTab();
-  }else{
-    document.getElementById('pin-err').style.display='block';
-    [0,1,2,3].forEach(i=>document.getElementById('p'+i).value='');
-    document.getElementById('p0').focus();
-  }
+function showManagement(open){
+  const show=open&&isAdmin;
+  element('management').hidden=!show;
+  element('admin-bar').classList.toggle('show',show);
+  document.body.classList.toggle('management-open',show);
+  if(show){renderManagement();element('manage-name').focus();}
 }
-function doLogout(){
+function checkAdminSession(user){
+  if(user && checkedUser===user.uid && pendingAccess) return pendingAccess;
+  checkedUser=user?.uid ?? null;
   isAdmin=false;
-  document.getElementById('admin-bar').classList.remove('show');
-  renderCurrentTab();
+  if(!user){
+    pendingAccess=null;
+    showManagement(false);
+    closeForm(true);
+    return Promise.resolve(false);
+  }
+  pendingAccess=db.doc('adminAccess/check').get({source:'server'}).then(()=>{
+    if(auth.currentUser?.uid!==user.uid) return false;
+    isAdmin=true;
+    if(element('login-overlay').classList.contains('show')){
+      closeLogin();
+      showManagement(true);
+    }
+    return true;
+  }).catch(error=>{
+    if(error.code!=='permission-denied') console.error(error);
+    if(checkedUser===user.uid) pendingAccess=null;
+    return false;
+  });
+  return pendingAccess;
+}
+async function signInAdmin(){
+  const button=element('google-login');
+  button.disabled=true;
+  element('login-status').textContent='계정을 확인하는 중이에요…';
+  try{
+    const provider=new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({prompt:'select_account'});
+    const result=await auth.signInWithPopup(provider);
+    if(await checkAdminSession(result.user)){
+      closeLogin();
+      showManagement(true);
+    }else{
+      await auth.signOut();
+      element('login-status').textContent='관리자 권한을 확인할 수 없어요. 등록된 계정인지 확인해 주세요.';
+    }
+  }catch(error){
+    console.error(error);
+    element('login-status').textContent=error.code==='auth/popup-blocked'
+      ? '팝업을 허용하고 다시 눌러 주세요.'
+      : '로그인하지 못했어요. 다시 시도해 주세요.';
+  }finally{button.disabled=false;}
+}
+async function doLogout(){
+  try{await auth.signOut();}
+  catch(error){console.error(error);alert('로그아웃하지 못했어요. 다시 시도해 주세요.');}
+}
+function listOptions(select, values, label){
+  const previous=select.value;
+  const unique=[...new Set(values.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
+  select.replaceChildren(new Option(label,''), ...unique.map(value=>new Option(value,value)));
+  if(unique.includes(previous)) select.value=previous;
+}
+function renderManagement(){
+  const fam=element('manage-fam');
+  const cell=element('manage-cell');
+  const query=element('manage-name').value.trim().replace(/\s+/g,'').normalize().toLowerCase();
+  listOptions(fam,members.map(m=>m.fam),'모든 팸');
+  const inFam=members.filter(m=>!fam.value||m.fam===fam.value);
+  listOptions(cell,inFam.map(m=>m.cell),'모든 셀');
+  const missing=element('manage-no-photo').checked;
+  const rows=inFam.filter(m=>
+    (!cell.value||m.cell===cell.value) &&
+    (!missing||!photoSource(m.photo)) &&
+    m.name.replace(/\s+/g,'').normalize().toLowerCase().includes(query)
+  ).sort((a,b)=>a.name.localeCompare(b.name,'ko'));
+  element('manage-count').textContent=membersReady
+    ? (rows.length ? `${rows.length}명` : '조건에 맞는 멤버가 없어요.')
+    : '멤버 명단을 불러오는 중이에요…';
+  element('manage-list').innerHTML=rows.map(m=>`
+    <article class="manage-row">
+      ${avatarHtml(m,44)}
+      <div class="manage-text"><strong>${escapeHtml(m.name)}</strong>
+        <small>${[m.fam,m.cell,m.role].filter(Boolean).map(escapeHtml).join(' · ')}</small>
+      </div>
+      <button class="btn-add" data-member="${escapeHtml(m.docId)}" onclick="openMemberForm(this.dataset.member)" aria-label="${escapeHtml(m.name)} 수정">수정</button>
+    </article>`).join('');
+}
+element('manage-name').addEventListener('input',renderManagement);
+for(const id of ['manage-fam','manage-cell','manage-no-photo']){
+  element(id).addEventListener('change',renderManagement);
 }
 
-// ── 멤버 추가/수정 ──
-function openMemberForm(docId=null){
-  document.getElementById('form-title').textContent=docId?'멤버 수정':'멤버 추가';
-  document.getElementById('form-sub').textContent=docId?'정보를 수정해 주세요':'새 멤버 정보를 입력해 주세요';
-  document.getElementById('f-docid').value=docId||'';
-  if(docId){
-    const m=members.find(x=>x.docId===docId);
-    document.getElementById('f-name').value=m.name;
-    document.getElementById('f-fam').value=m.fam;
-    document.getElementById('f-cell').value=m.cell;
-    document.getElementById('f-year').value=m.year;
-    document.getElementById('f-gender').value=m.gender;
-    document.getElementById('f-role').value=m.role;
-    document.getElementById('f-photo').value=m.photo||'';
-  }else{
-    ['f-name','f-cell','f-role','f-photo'].forEach(id=>document.getElementById(id).value='');
-    document.getElementById('f-fam').value='';
-    document.getElementById('f-gender').value='';
-    document.getElementById('f-year').value='';
+// ── 멤버 수정과 사진 ──
+let existingPhoto='';
+let selectedPhoto;
+let photoVersion=0;
+let preparingPhoto=false;
+let savingMember=false;
+let memberWrite=null;
+
+function openMemberForm(docId=''){
+  if(!isAdmin||savingMember||memberWrite) return;
+  const member=docId?members.find(m=>m.docId===docId):null;
+  if(docId&&!member) return;
+  element('member-form').reset();
+  field('docid').value=docId;
+  for(const name of ['name','fam','cell','year','gender','role']){
+    field(name).value=member?.[name]??'';
   }
-  document.getElementById('form-overlay').classList.add('show');
+  existingPhoto=photoSource(member?.photo);
+  clearPhotoSelection();
+  element('form-title').textContent=docId?'멤버 수정':'멤버 추가';
+  element('form-sub').textContent=docId?'사진과 멤버 정보를 수정해 주세요.':'새 멤버 정보를 입력해 주세요.';
+  element('member-delete').hidden=!docId;
+  element('form-overlay').classList.add('show');
+  field('name').focus();
 }
-function closeForm(){document.getElementById('form-overlay').classList.remove('show');}
-function toPhotoUrl(raw){
-  if(!raw) return '';
-  // 구글 드라이브 링크 자동 변환
-  const m=raw.match(/\/d\/([^\/\?]+)/);
-  if(m) return 'https://drive.google.com/thumbnail?id='+m[1]+'&sz=w200';
-  return raw;
+function closeForm(force=false){
+  if(savingMember&&!force)return;
+  element('form-overlay').classList.remove('show');
+  photoVersion++;
 }
-async function saveMember(){
-  const name=document.getElementById('f-name').value.trim();
-  const fam=document.getElementById('f-fam').value;
-  const cell=document.getElementById('f-cell').value.trim()||'미배정';
-  const year=parseInt(document.getElementById('f-year').value);
-  const gender=document.getElementById('f-gender').value;
-  const role=document.getElementById('f-role').value.trim()||'셀원';
-  const photo=toPhotoUrl(document.getElementById('f-photo').value.trim());
-  const docId=document.getElementById('f-docid').value;
-  if(!name||!fam||!year){alert('이름, 팸, 출생연도는 필수예요');return;}
-  const data={name,fam,cell,year,gender,role,photo};
-  if(docId){
-    await db.collection('members').doc(docId).update(data);
-  }else{
-    await db.collection('members').add(data);
+function setFormBusy(){
+  element('member-save').disabled=preparingPhoto||savingMember;
+  element('member-cancel').disabled=savingMember;
+  element('member-delete').disabled=savingMember;
+  field('photo').disabled=savingMember;
+  element('photo-reset').disabled=savingMember;
+  element('photo-remove').disabled=savingMember;
+}
+function showPhotoPreview(){
+  const url=selectedPhoto??existingPhoto;
+  const preview=element('photo-preview');
+  preview.hidden=!url;
+  if(url) preview.src=url;
+  else preview.removeAttribute('src');
+  element('photo-reset').hidden=selectedPhoto===undefined&&!preparingPhoto;
+  element('photo-remove').hidden=!url||preparingPhoto;
+  setFormBusy();
+}
+function clearPhotoSelection(){
+  photoVersion++;
+  selectedPhoto=undefined;
+  preparingPhoto=false;
+  field('photo').value='';
+  element('form-status').textContent='';
+  showPhotoPreview();
+}
+async function compressPhoto(file){
+  if(file.size>25*1024*1024) throw new Error('25MB 이하의 사진을 선택해 주세요.');
+  const source=URL.createObjectURL(file);
+  try{
+    const image=new Image();
+    image.src=source;
+    try{await image.decode();}
+    catch{throw new Error('이 사진을 읽지 못했어요. JPG, PNG 또는 WebP 사진을 선택해 주세요.');}
+    const canvas=document.createElement('canvas');
+    const scale=Math.min(1,320/Math.max(image.naturalWidth,image.naturalHeight));
+    canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));
+    canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+    const context=canvas.getContext('2d',{alpha:false});
+    context.fillStyle='#fff';
+    context.fillRect(0,0,canvas.width,canvas.height);
+    context.drawImage(image,0,0,canvas.width,canvas.height);
+    for(const quality of [0.8,0.65,0.5,0.35]){
+      const jpeg=canvas.toDataURL('image/jpeg',quality);
+      if(jpeg.startsWith('data:image/jpeg;base64,')&&jpeg.length<=80000) return jpeg;
+    }
+    throw new Error('사진 용량을 줄이지 못했어요. 더 작은 사진을 선택해 주세요.');
+  }finally{URL.revokeObjectURL(source);}
+}
+field('photo').addEventListener('change',async event=>{
+  const file=event.target.files[0];
+  if(!file) return;
+  const version=++photoVersion;
+  selectedPhoto=undefined;
+  preparingPhoto=true;
+  element('form-status').textContent='사진을 준비하는 중이에요…';
+  showPhotoPreview();
+  try{
+    const compressed=await compressPhoto(file);
+    if(version!==photoVersion) return;
+    selectedPhoto=compressed;
+    element('form-status').textContent='저장하면 명단과 퀴즈에 반영돼요.';
+  }catch(error){
+    if(version!==photoVersion) return;
+    field('photo').value='';
+    element('form-status').textContent=error.message;
+  }finally{
+    if(version===photoVersion){preparingPhoto=false;showPhotoPreview();}
   }
-  closeForm();
+});
+element('photo-reset').addEventListener('click',clearPhotoSelection);
+element('photo-remove').addEventListener('click',()=>{
+  clearPhotoSelection();
+  selectedPhoto='';
+  element('form-status').textContent='저장하면 사진이 제거돼요.';
+  showPhotoPreview();
+});
+async function saveMember(event){
+  event.preventDefault();
+  if(!isAdmin||preparingPhoto||savingMember)return;
+  const name=field('name').value.trim();
+  if(!name){
+    element('form-status').textContent='이름을 입력해 주세요.';
+    field('name').focus();
+    return;
+  }
+  const data={
+    name,
+    fam:field('fam').value,
+    cell:field('cell').value.trim()||'미배정',
+    year:Number(field('year').value),
+    gender:field('gender').value,
+    role:field('role').value.trim()||'셀원'
+  };
+  const docId=field('docid').value;
+  if(selectedPhoto!==undefined||!docId) data.photo=selectedPhoto??'';
+  await writeMember(
+    ()=>docId?db.collection('members').doc(docId).update(data):db.collection('members').add(data),
+    '저장'
+  );
 }
-function editMember(e,docId){e.stopPropagation();openMemberForm(docId);}
-async function deleteMember(e,docId){
-  e.stopPropagation();
-  const m=members.find(x=>x.docId===docId);
-  if(!confirm(`${m.name}님을 삭제할까요?`))return;
-  await db.collection('members').doc(docId).delete();
+async function writeMember(run, action){
+  savingMember=true;
+  setFormBusy();
+  element('form-status').textContent=action+' 중이에요…';
+  try{
+    memberWrite=run();
+    await memberWrite;
+    closeForm(true);
+  }catch(error){
+    console.error(error);
+    element('form-status').textContent=action+'하지 못했어요. 로그인 상태와 인터넷 연결을 확인해 주세요.';
+  }finally{
+    memberWrite=null;
+    savingMember=false;
+    setFormBusy();
+  }
 }
+element('member-form').addEventListener('submit',saveMember);
+element('member-delete').addEventListener('click',async ()=>{
+  if(!isAdmin||savingMember)return;
+  const member=members.find(m=>m.docId===field('docid').value);
+  if(!member||!confirm(member.name+'님을 삭제할까요?'))return;
+  await writeMember(()=>db.collection('members').doc(member.docId).delete(),'삭제');
+});
 
 // ── 퀴즈 ──
 let qMode='all'; let qFilter=null;
@@ -727,7 +784,7 @@ function renderQuizSubBar(){
   } else {
     const famPool=basePool.filter(m=>m.fam===qMode);
     const cells=[...new Set(famPool.map(m=>m.cell))].sort();
-    bar.innerHTML=cells.map(c=>`<button class="quiz-mode-btn ${qFilter===c?'active':''}" onclick="setQuizFilter('${c.replace(/'/g,"\\'")}')"> ${c}</button>`).join('');
+    bar.innerHTML=cells.map(c=>`<button class="quiz-mode-btn ${qFilter===c?'active':''}" data-filter="${escapeHtml(c)}" onclick="setQuizFilter(this.dataset.filter)"> ${escapeHtml(c)}</button>`).join('');
   }
 }
 function setQuizFilter(val){qFilter=val;renderQuizSubBar();startQuiz();}
@@ -748,6 +805,10 @@ function startQuiz(){
   document.getElementById('quiz-result').style.display='none';
   document.getElementById('quiz-main').style.display='block';
   if(pool.length<2){
+    qQueue=[];qIdx=0;qScore=0;qTotal=0;qStreak=0;
+    updateQuizBar();
+    for(const id of ['q-avatar','q-hint','q-fb']) document.getElementById(id).textContent='';
+    document.getElementById('q-next').classList.remove('show');
     document.getElementById('q-opts').innerHTML='<div style="grid-column:1/-1;text-align:center;color:#bbb;padding:20px;font-size:14px;">멤버가 2명 이상 필요해요</div>';
     return;
   }
@@ -772,13 +833,13 @@ function nextQuestion(){
   const s=famStyle(cur.fam);
   const av=document.getElementById('q-avatar');
   av.style.background=s.bg; av.style.color=s.color; av.style.fontSize='36px';
-  av.innerHTML=cur.photo?`<img src="${cur.photo}" onerror="this.style.display='none'">`:`<span>${cur.name.slice(0,2)}</span>`;
+  av.innerHTML=memberPhoto(members.find(m=>m.docId===cur.docId) || cur);
   document.getElementById('q-hint').textContent=`${cur.fam} · ${cur.cell} · ${getAge(cur.year)}세`;
   const allPool=getQuizPool();
   const wrongs=shuffle(allPool.filter(m=>m.docId!==cur.docId)).slice(0,3);
   const opts=shuffle([cur,...wrongs]);
   document.getElementById('q-opts').innerHTML=opts.map(m=>
-    `<button class="option-btn" id="qopt-${m.docId}" onclick="chooseAnswer('${m.docId}','${cur.docId}')">${m.name}</button>`
+    `<button class="option-btn" id="qopt-${escapeHtml(m.docId)}" data-choice="${escapeHtml(m.docId)}" data-correct="${escapeHtml(cur.docId)}" onclick="chooseAnswer(this.dataset.choice,this.dataset.correct)">${escapeHtml(m.name)}</button>`
   ).join('');
   qIdx++; updateQuizBar();
 }
@@ -815,6 +876,7 @@ function showQuizResult(){
 
 // ── 시작 ──
 startFirebaseListener();
+auth.onAuthStateChanged(checkAdminSession);
 </script>
 </body>
 </html>
